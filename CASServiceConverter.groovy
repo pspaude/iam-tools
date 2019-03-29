@@ -205,7 +205,7 @@ def processResult(casService, remainFileCount) {
         }
 
         if (casService.releaseAttributes) {
-            attributeStorage.get(casService.releaseAttributes.tokenize(',').toSet().asImmutable()).add(casService.name)
+            attributeStorage.get(casService.releaseAttributes.tokenize(',').toSet().asImmutable()).add((casService.name + casService.id))
         }
 
         if (remainFileCount < 1) {
@@ -278,7 +278,7 @@ def outputShibCASServicesAndAttributes() {
                   "\n                <!-- " + cs.evaluationOrder + ". " + cs.name + ": " + cs.description + "; Former id: " + cs.id + " -->"
                 + "\n                <bean class=\"net.shibboleth.idp.cas.service.ServiceDefinition\""
                 + "\n                      c:regex=\"" + cs.serviceId + "\""
-                + "\n                      p:group=\"" + cs.name + "\""
+                + "\n                      p:group=\"" + cs.name + cs.id + "\""
                 + "\n                      p:authorizedToProxy=\"" + proxy + "\""
                 + "\n                      p:singleLogoutParticipant=\"" + slo + "\" />")
         }
@@ -360,9 +360,7 @@ def outputShibCASAttributes(isBeanDef) {
                 }
                 attributeFile.append(
                       "\n       </PolicyRequirementRule>"
-                    + "\n       <AttributeRule attributeID=\"uid\"> "
-                    + "\n           <PermitValueRule xsi:type=\"ANY\"/>"
-                    + "\n       </AttributeRule> "
+                    + "\n       <AttributeRule attributeID=\"uid\" permitAny=\"true\" /> "
                     + "\n  </AttributeFilterPolicy>")                
 
             } else if (attributeSet.size() < 2 && attributeSet.contains("all")) {
@@ -390,9 +388,7 @@ def outputShibCASAttributes(isBeanDef) {
                       "\n       </PolicyRequirementRule>")
                 attributeSet.each {
                     attributeFile.append(
-                      "\n       <AttributeRule attributeID=\"" + it + "\"> "
-                    + "\n           <PermitValueRule xsi:type=\"ANY\"/>"
-                    + "\n       </AttributeRule> ")
+                      "\n       <AttributeRule attributeID=\"" + it + "\" permitAny=\"true\" />")
                 }
                 attributeFile.append(
                       "\n  </AttributeFilterPolicy>")                    
