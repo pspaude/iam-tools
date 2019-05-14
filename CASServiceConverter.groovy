@@ -41,7 +41,7 @@ origFormat = opt.currentformat
 origLocation = new File(opt.currentdir)
 resultFormat = opt.resultformat
 resultLocation = new File(opt.resultlocation)
-@Field TreeMap servicesStorage = [:] //used for storing services in order to print out results based on evaluation order
+@Field TreeMap servicesStorage = [:] //used for storing services in order to print out results based on evaluation order, value is list of services for that order
 @Field Map usernameStorage = [:].withDefault{key -> return []} //key is username to release, value is list of serviceIds that release that username
 @Field Map proxyStorage = [:].withDefault{key -> return[]} //key is pair of key location and algorithm, value is list of serviceIds that use this key
 @Field Map attributeStorage = [:].withDefault{key -> return[]} //key is set of release attributes, value is list of serviceIds that release those values (none, default, and all are also possible keys)
@@ -194,8 +194,14 @@ def processResult(casService, remainFileCount) {
     if (resultFormats.get(0).equalsIgnoreCase(resultFormat)) {
         //TODO CAS 5.x+ JSON output
     } else {
-        servicesStorage.put(casService.evaluationOrder.toInteger(), casService)
-    
+        //println "\nProcessing Service # [${remainFileCount}] with id [${casService.id}] with evaluationOrder [${casService.evaluationOrder}]"
+        if (servicesStorage.containsKey(casService.evaluationOrder.toInteger())) {
+           println "\nWARNING EvaluationOrder [${casService.evaluationOrder.toInteger()}] has duplicate(s)!"
+           servicesStorage.get(casService.evaluationOrder.toInteger()).add(casService)
+        } else {
+           servicesStorage.put(casService.evaluationOrder.toInteger(), [casService])
+        }
+
         if (casService.usernameAttribute && !casService.usernameAttribute.allWhitespace) {        
             usernameStorage.get(casService.usernameAttribute).add(casService.serviceId)
         }
@@ -269,19 +275,24 @@ def outputShibCASServicesAndAttributes() {
             serviceFile.append("<!-- Place the beans below into idp_home/conf/cas-protocol.xml in your Shibboleth IdP." 
                 + " Remember service order matters! -->")
         }
-
+        
+        def i = 0
         servicesStorage.keySet().sort().each{ id ->
-            def cs = servicesStorage[id]
-            def slo = (cs.logoutType) ? true : false   //TODO Implement SLO?
-            def proxy = ((cs?.authorizedToReleaseProxyGrantingTicket == true || cs?.authorizedToReleaseCredentialPassword) && cs?.publicKeyLocation) ? true : false
-            serviceFile.append(
-                  "\n                <!-- " + cs.evaluationOrder + ". " + cs.name + ": " + cs.description + "; Former id: " + cs.id + " -->"
-                + "\n                <bean class=\"net.shibboleth.idp.cas.service.ServiceDefinition\""
-                + "\n                      c:regex=\"" + cs.serviceId + "\""
-                + "\n                      p:group=\"" + cs.name + cs.id + "\""
-                + "\n                      p:authorizedToProxy=\"" + proxy + "\""
-                + "\n                      p:singleLogoutParticipant=\"" + slo + "\" />")
+            servicesStorage[id].each{ cs ->
+                i++
+                def slo = (cs.logoutType) ? true : false   //TODO Implement SLO?
+                def proxy = ((cs?.authorizedToReleaseProxyGrantingTicket == true || cs?.authorizedToReleaseCredentialPassword) && cs?.publicKeyLocation) ? true : false
+                serviceFile.append(
+                      "\n                <!-- " + i + ". Name: " + cs.name + ", Description: " + cs.description + " Id: " + cs.id + ", EvalOrder: " + cs.evaluationOrder + " -->"
+                    + "\n                <bean class=\"net.shibboleth.idp.cas.service.ServiceDefinition\""
+                    + "\n                      c:regex=\"" + cs.serviceId + "\""
+                    + "\n                      p:group=\"" + cs.name + cs.id + "\""
+                    + "\n                      p:authorizedToProxy=\"" + proxy + "\""
+                    + "\n                      p:singleLogoutParticipant=\"" + slo + "\" />")
+            }
         }
+
+        println "\nThere were ${i} services/beans added to cas-protocol.xml!"
 
         if (proxyStorage.size() > 0) {
             serviceFile.append(
