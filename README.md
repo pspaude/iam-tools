@@ -1,5 +1,5 @@
 # iam-tools
-Tools for upgrading or conversion between IAM technologies
+Tools for upgrading or conversion between IAM technologies and other external tools for IAM functionality.
 
 1. CASServiceConverter is a script for converting CAS services between CAS 3.x,4.x+ JSON and Shibboleth IdP xml bean or metadata.
 
