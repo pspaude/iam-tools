@@ -1,0 +1,22 @@
+plugins {
+    id 'groovy'
+    id 'java'
+    id 'application'
+}
+
+group 'net.unicon.iam'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.8
+
+repositories {
+    mavenCentral()
+}
+
+dependencies {
+    compile "org.codehaus.groovy:groovy-all:${project.'groovy.version'}"
+}
+
+application {
+    mainClassName = 'net.unicon.iam.cas.service.converter.MainClass'
+}
