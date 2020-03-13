@@ -16,4 +16,10 @@ class CasService {
     String authorizedToReleaseProxyGrantingTicket
     String publicKeyLocation
     String publicKeyAlgorithm
+    String ssoEnabled
+    String enabled
+    String allowedToProxy
+    String anonymousAccess
+    String theme
+    Map<String, String> staticAttributes
 }
