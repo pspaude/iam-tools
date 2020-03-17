@@ -24,27 +24,27 @@ class CAS3JSONConverter {
 
                     //TODO any other properties to capture?
                     resultProcessor.storeResult(new CasService(
-                            serviceId: convertAntToJavaRegex(json?.serviceId),
-                            name: json?.name,
-                            id: json?.id,
-                            description: json?.description,
-                            evaluationOrder: json?.evaluationOrder,
-                            usernameAttribute: json?.usernameAttributeProvider?.usernameAttribute,
-                            logoutType: json?.logoutType,
-                            releaseAttributes: json?.allowedAttributes?.join(","),
-                            authorizedToReleaseCredentialPassword: json?.attributeReleasePolicy?.authorizedToReleaseCredentialPassword,
-                            authorizedToReleaseProxyGrantingTicket: json?.attributeReleasePolicy?.authorizedToReleaseProxyGrantingTicket,
-                            publicKeyLocation: json?.publicKey?.location,
-                            publicKeyAlgorithm: json?.publicKey?.algorithm,
-                            ssoEnabled: json?.ssoEnabled,
-                            enabled: json?.enabled,
-                            allowedToProxy: json?.allowedToProxy,
-                            anonymousAccess: json?.anonymousAccess,
-                            theme: json?.theme,
-                            staticAttributes: convertExtraAttributes(json?.extraAttributes)
+                            serviceId: convertAntToJavaRegex(service?.serviceId),
+                            name: service?.name,
+                            id: service?.id,
+                            description: service?.description,
+                            evaluationOrder: service?.evaluationOrder,
+                            usernameAttribute: service?.usernameAttributeProvider?.usernameAttribute,
+                            logoutType: service?.logoutType,
+                            releaseAttributes: service?.allowedAttributes?.join(","),
+                            authorizedToReleaseCredentialPassword: service?.attributeReleasePolicy?.authorizedToReleaseCredentialPassword,
+                            authorizedToReleaseProxyGrantingTicket: service?.attributeReleasePolicy?.authorizedToReleaseProxyGrantingTicket,
+                            publicKeyLocation: service?.publicKey?.location,
+                            publicKeyAlgorithm: service?.publicKey?.algorithm,
+                            ssoEnabled: service?.ssoEnabled,
+                            enabled: service?.enabled,
+                            allowedToProxy: service?.allowedToProxy,
+                            anonymousAccess: service?.anonymousAccess,
+                            theme: service?.theme,
+                            staticAttributes: convertExtraAttributes(service?.extraAttributes)
                     ))
                 } catch (Exception e) {
-                    println "Error processing single JSON 3x Service with id ${json?.id} with exception " + e
+                    println "Error processing single JSON 3x Service with id ${service?.id} with exception " + e
                 }
             }
         } catch (Exception e) {
@@ -56,16 +56,16 @@ class CAS3JSONConverter {
      *  Converts as best a possible the former ant regular expression into new CAS Java regex
      * @param serviceId
      */
-    def convertAntToJavaRegex(final String serviceId) {
-        if (!serviceId?.isEmpty()) {
-            def toReturn = serviceId.trim().replace("**", "*")
+    private static String convertAntToJavaRegex(final String serviceId) {
+        if (serviceId && !serviceId.isEmpty()) {
+            def toReturn = serviceId?.trim()?.replace("**", "*")
 
             if (serviceId.endsWith("(http|https)")) {
-                toReturn = "https?://" + (serviceId.substring(0, serviceId.indexOf("(http|https)")))
+                toReturn = "https?://" + (toReturn.substring(0, toReturn.indexOf("(http|https)")))
             }
 
             if (serviceId.startsWith("http*:")) {
-                toReturn = serviceId.replace("http*", "https?")
+                toReturn = toReturn.replace("http*", "https?")
             }
 
             //TODO any other conditions in ant to capture?
@@ -73,14 +73,14 @@ class CAS3JSONConverter {
             return toReturn
         }
 
-        return serviceId.trim()
+        return serviceId
     }
 
     /**
      * Converts as best possible the custom extra attributes notation
      * @param extraAttrs
      */
-    def convertExtraAttributes(def extraAttrs) {
+    private static Map<String,String> convertExtraAttributes(def extraAttrs) {
         if (extraAttrs) {
             def toReturn = [:]
             extraAttrs.each {k,v ->

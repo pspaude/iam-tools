@@ -66,7 +66,7 @@ class ShibbolethIdpResultProcessor extends ResultProcessor {
 
     def outputShibCASServicesAndAttributes(resultFormat) {
         try {
-
+            //TODO Handle static/extra attributes?
             if (resultFormat?.equalsIgnoreCase(ResultFormats.shibxml.toString())) {
                 def serviceFile = new File(resultLocation.getAbsolutePath() + File.separator + "cas-protocol.xml")
                 println "\nCreating service/key file cas-protocol.xml in " + serviceFile.getPath()
