@@ -1,16 +1,19 @@
 package net.unicon.iam.cas.service.converter.converters
 
 import groovy.io.FileType
-import groovy.json.JsonSlurper
+import org.hjson.JsonValue;
 import net.unicon.iam.cas.service.converter.result.ResultProcessor
 import net.unicon.iam.cas.service.converter.util.CasService
 
 
 class CASJSONConverter {
 
-    static void convertCASJSON(isDirectory, origLocation, final ResultProcessor resultProcessor) {
+    private static int skipCount
+
+    static void convertCASJSON(final boolean isDirectory, final File origLocation, final ResultProcessor resultProcessor) {
         if (isDirectory) {
-            println "\nProcessing CAS 5.x+ JSON Services..."
+            skipCount = 0
+            println "\n\nProcessing ${origLocation.listFiles().length} possible CAS 5.x+ JSON Services..."
             def serviceCount = 0
 
             origLocation.eachFileRecurse(FileType.FILES) { file ->
@@ -20,17 +23,18 @@ class CASJSONConverter {
                         serviceCount++
 
                     } else {
-                        println "\nSkipping ${file.name} because it doesn't have JSON extension!"
+                        println "\n\nSkipping ${file.name} because it doesn't have JSON extension!"
+                        skipCount++
                     }
                 } catch (Exception e) {
                     println "Error processing 5x+ JSON file with name ${file.name} with exception " + e
+                    skipCount++
                 }
             }
-            println "Processed ${serviceCount} CAS 5.x+ JSON Files!"
+            println "\n\nProcessed ${serviceCount-skipCount} out of ${serviceCount} CAS 5.x+ JSON Files!"
 
         } else {
-
-            println "\nProcessing a single CAS 5.x+ JSON Service"
+            println "\n\nProcessing a single CAS 5.x+ JSON Service"
             if (origLocation.name.endsWith(".json")) {
                 try {
                     resultProcessor.storeResult(consumeJSONCAS(origLocation))
@@ -42,45 +46,46 @@ class CASJSONConverter {
                 println "\nCan't process file because it doesn't have valid JSON extension!"
             }
         }
-
     }
 
     private static CasService consumeJSONCAS(final File file) throws Exception {
-        def json = new JsonSlurper().parseText(file.text)
-        //TODO check @class here ensure is RegexRegisteredService
+        def json = JsonValue.readHjson(file.text) //throws parse exception if invalid hjson
 
-        if ((!json.serviceId || json.serviceId.allWhitespace) || (!json.name || json.name.allWhitespace) || (!json.id)) {
-            println "\nWarning: JSON for file [${file.name}] is not complete/valid. Missing or empty serviceId, name or id!"
-        }
-
-        def releaseAttributes = "default"
-        if (json?.attributeReleasePolicy?.get("@class").contains("ReturnAllAttributeReleasePolicy")) {
-            releaseAttributes = "all"
-        } else if (json?.attributeReleasePolicy?.get("@class").contains("ReturnAllowedAttributeReleasePolicy")) {
-            if (json?.attributeReleasePolicy?.allowedAttributes) {
-                releaseAttributes = json?.attributeReleasePolicy?.allowedAttributes.get(1).join(",")
+        if (json?.isObject() && json?.getAt("@class")?.toString()?.contains("RegexRegisteredService")) {
+            def releaseAttributes = "default"
+            if (json?.attributeReleasePolicy?.get("@class")?.toString()?.contains("ReturnAllAttributeReleasePolicy")) {
+                releaseAttributes = "all"
+            } else if (json?.attributeReleasePolicy?.get("@class")?.toString()?.contains("ReturnAllowedAttributeReleasePolicy")) {
+                if (json?.attributeReleasePolicy?.allowedAttributes?.size() > 0) {
+                    releaseAttributes = json?.attributeReleasePolicy?.allowedAttributes?.get(1)?.values()?.join(",")?.replaceAll("\"", "")
+                } else {
+                    releaseAttributes = "default"
+                }
             } else {
-                releaseAttributes = "default"
+                //TODO DenyAllAttributeReleasePolicy,ReturnMappedAttributeReleasePolicy and warn user to manually convert groovy,python, rest, regex etc.
             }
-        } else {
-            //TODO DenyAllAttributeReleasePolicy,ReturnMappedAttributeReleasePolicy and warn user to manually convert groovy,python, rest, regex etc.
-        }
 
-        return new CasService(
-                serviceId: json?.serviceId,
-                name: json?.name,
-                id: json?.id,
-                description: json?.description,
-                evaluationOrder: json?.evaluationOrder,
-                usernameAttribute: json?.usernameAttributeProvider?.usernameAttribute,
-                logoutType: json?.logoutType,
-                mfaProviders: json?.multifactorPolicy?.multifactorAuthenticationProviders,
-                mfaFailureMode: json?.multifactorPolicy?.failureMode,
-                releaseAttributes: releaseAttributes,
-                authorizedToReleaseCredentialPassword: json?.attributeReleasePolicy?.authorizedToReleaseCredentialPassword,
-                authorizedToReleaseProxyGrantingTicket: json?.attributeReleasePolicy?.authorizedToReleaseProxyGrantingTicket,
-                publicKeyLocation: json?.publicKey?.location,
-                publicKeyAlgorithm: json?.publicKey?.algorithm
-        )
+            return new CasService(
+                    serviceId: json?.serviceId?.asString(),
+                    name: json?.name?.asString(),
+                    id: json?.id?.asInt(),
+                    description: json?.description?.asString(),
+                    evaluationOrder: json?.evaluationOrder?.asInt(),
+                    usernameAttribute: json?.usernameAttributeProvider?.usernameAttribute?.asString(),
+                    logoutType: json?.logoutType?.asString(),
+                    mfaProviders: json?.multifactorPolicy?.multifactorAuthenticationProviders?.get(1)?.values()?.join(",")?.replaceAll("\"", ""), //TODO likely need to fix
+                    mfaFailureMode: json?.multifactorPolicy?.failureMode?.asString(),  //TODO likely need to fix
+                    releaseAttributes: releaseAttributes,
+                    authorizedToReleaseCredentialPassword: json?.attributeReleasePolicy?.authorizedToReleaseCredentialPassword?.asString(),
+                    authorizedToReleaseProxyGrantingTicket: json?.attributeReleasePolicy?.authorizedToReleaseProxyGrantingTicket?.asString(),
+                    publicKeyLocation: json?.publicKey?.location?.asString(),
+                    publicKeyAlgorithm: json?.publicKey?.algorithm?.asString()
+            )
+
+        } else {
+            println "Skipping ${file.name} because it's not of the type RegexRegisteredService!"
+            skipCount++
+            return null
+        }
     }
 }

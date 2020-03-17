@@ -1,27 +1,49 @@
-package net.unicon.iam.jmeter.parser
+package net.unicon.iam.loadtest.cas.jmeter.parser
 
 class LoadTestParser implements Runnable {
 
-    final String results = "/tmp/results"
-    final String tests = "/tmp/tests"
+    def existingLocation
+    def outputLocation
+
+
+    LoadTestParser(final URL configProps) {
+        if (configProps) {
+            println "CAS Jmeter Parser: Retrieving parser config..."
+            def config = retrieveAndParsePropertiesFile(configProps.getPath()) //Retrieve existing parser.properties configuration
+            existingLocation = config.getProperty("loadtest.cas.jmeter.currentresults").toString().trim()
+            outputLocation = config.getProperty("loadtest.cas.jmeter.output").toString().trim()
+
+        } else {
+            println "CAS Jmeter Parser:  No Configuration found!"
+        }
+    }
 
     @Override
     void run() {
-        println "Starting Load Test Parser"
-        def testDir = new File(tests)
-        def counts = ["http":0, "local":0, "other":0, "good":0]
+        println "CAS Jmeter Parser: Starting Load Test Parser"
+        try {
+            def testDir = new File(existingLocation)
+            def counts = ["http": 0, "local": 0, "other": 0, "good": 0]
 
-        testDir.eachFileRecurse { file ->
-            processJtlFileForCAS(file, counts)
+            testDir.eachFileRecurse { file ->
+                try {
+                    processJtlFileForCAS(file, counts)
+                } catch (Exception e) {
+                    println "CAS Jmeter Parser: Error processing results file ${file.getName()}! " + e
+                }
+            }
+
+            printResults(counts)
+
+        } catch (Exception e) {
+            println "CAS Jmeter Parser: Error processing current results directory! " + e
         }
-
-        printResults(counts)
     }
 
-    def processJtlFileForCAS(final File file, final Map<String,Integer> counts) {
-        def http = new File((results+"/httperrors.csv"))
-        def local = new File((results+"/jmeterlocalerrors.csv"))
-        def other = new File((results+"/othererrors.csv"))
+    def processJtlFileForCAS(final File file, final Map<String,Integer> counts) throws Exception {
+        def http = new File((outputLocation+"/httperrors.csv"))
+        def local = new File((outputLocation+"/jmeterlocalerrors.csv"))
+        def other = new File((outputLocation+"/othererrors.csv"))
 
         file.splitEachLine(",") {fields ->
             if (fields.size() >= 4) {
@@ -61,9 +83,13 @@ class LoadTestParser implements Runnable {
     }
 
     def printResults(final Map<String,Integer> counts) {
-        def analysisFile = new File((results+"/analysis.txt"))
-        analysisFile.withWriter { out ->
-            out.write(createResults(counts))
+        try {
+            def analysisFile = new File((outputLocation + "/analysis.txt"))
+            analysisFile.withWriter { out ->
+                out.write(createResults(counts))
+            }
+        } catch (Exception e) {
+            println "CAS Jmeter Parser: Error writing organized results to ${outputLocation}! " + e
         }
     }
 
@@ -79,5 +105,22 @@ class LoadTestParser implements Runnable {
         text.append("Total Error Count: " + totalErrors + System.lineSeparator())
 
         return text.toString()
+    }
+
+    private def retrieveAndParsePropertiesFile (final String resource) {
+        try {
+            def returnProps = new Properties()
+            def propsFile = new File(resource)
+
+            propsFile.withInputStream {
+                returnProps.load(it)
+            }
+
+            return returnProps
+
+        } catch (Exception e) {
+            println "CAS Jmeter Parser: Error couldn't find/parse " + resource + " file! Found error: " + e
+            return null
+        }
     }
 }

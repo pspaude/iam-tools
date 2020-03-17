@@ -10,7 +10,6 @@ class CAS3JSONConverter {
     static void convertCAS3JSON(final File jsonFile, final ResultProcessor resultProcessor) {
         println "\nProcessing a single CAS 3.x JSON Service file"
         try {
-            def casServices = []
             def json = new JsonSlurper().parseText(jsonFile.text)
 
             if (!json?.services) {
@@ -21,11 +20,9 @@ class CAS3JSONConverter {
                 try {
                     if ((!service.serviceId || service.serviceId.allWhitespace) || (!service.name || service.name.allWhitespace) || (!service.id)) {
                         println "\nWarning: JSON for service [${service.toString()}] is not complete/valid. Missing or empty serviceId, name or id!"
-                        //TODO is this right?
                     }
 
                     //TODO any other properties to capture?
-
                     resultProcessor.storeResult(new CasService(
                             serviceId: convertAntToJavaRegex(json?.serviceId),
                             name: json?.name,

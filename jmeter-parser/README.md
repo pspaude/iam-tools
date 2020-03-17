@@ -1,5 +1,9 @@
 # JMeter Parser
 
-Tool for parsing Load Test output from JMeter.
+Tool for organizing Load Test output from JMeter.
 
-TODO add how to use here
+Configuration
+In `src/main/resources/parser.properties`
+
+Usage
+`./gradlew run`

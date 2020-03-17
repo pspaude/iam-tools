@@ -2,11 +2,11 @@
 
 Tool for converting between CAS JSON formats and also between Shibboleth IdP CAS bean definitions.
 
-CLI options (use -help for help), if not using help it must contain all 4!
-- --currentdir `arg`     =   Current service location (can be file or directory path)
-- --currentformat `arg`  =   Current service format
-- --resultformat `arg`   =   The output format
-- --resultlocation `arg` =   The output location
+Set options in the `src/main/resources/converter.properties` file.
+- currentdirorfile =   Current service location (can be file or directory path)
+- currentformat =   Current service format
+- resultformat =   The output format
+- resultlocation =   The output location
 
 Current formats accepted: 
 -    cas3json
@@ -24,5 +24,12 @@ to the specified format and location.
 
 **Example:** 
 ```
-./gradlew run -currentdir /tmp/old_cas_services -currentformat cas3json -resultlocation /tmp/new_cas_services -resultformat shibxml
+converter.currentdirorfile=/tmp/old_cas_services/services.conf
+converter.currentformat=cas3json
+converter.resultlocation=/tmp/new_cas_services
+converter.resultformat=shibxml
 ``` 
+
+**Usage:**
+
+`./gradlew run`
