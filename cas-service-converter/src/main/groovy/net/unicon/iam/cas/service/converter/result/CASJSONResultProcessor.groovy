@@ -122,7 +122,7 @@ class CASJSONResultProcessor extends ResultProcessor {
         if (cs?.allowedToProxy && cs?.allowedToProxy.equalsIgnoreCase("true")) {
             builder.append("  \"proxyPolicy\" : { " + System.lineSeparator())
             builder.append("    \"@class\" : \"org.apereo.cas.services.RegexMatchingRegisteredServiceProxyPolicy" + singleLineEnd)
-            builder.append("    \"pattern\" : \"^https?://.*\"" + blockEnd)
+            builder.append("    \"pattern\" : \"^https?://.*" + blockEnd)
         }
 
         if (cs?.mfaProviders) {
