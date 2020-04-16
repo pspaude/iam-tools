@@ -42,6 +42,14 @@ class CASJSONResultProcessor extends ResultProcessor {
                 }
             }
             println "Created ${fileCount} CAS 5.x+ JSON Service Files"
+            final Set<String> attributesToRelease = []
+            attributeStorage.keySet().each { attrList ->
+                attrList.each {
+                    attributesToRelease.add(it)
+                }
+            }
+            println "List of Attributes to be Released: [" + attributesToRelease.toString() + "]."
+
         } else {
             //Do nothing not the right format
         }
@@ -57,6 +65,14 @@ class CASJSONResultProcessor extends ResultProcessor {
         }
 
         name = name.replaceFirst("^_+", "") //remove any preceding _ chars
+
+        if (name.contains("_-_")) {
+            name = name.replace("_-_", "_")
+        }
+
+        if (name.contains("-")) {
+            name = name.replace("-", "_")
+        }
 
         if (name.contains("__")) {
             name = name.substring(0, name.indexOf("__"))  //presumably a long file name so we'll cut it short
@@ -76,7 +92,7 @@ class CASJSONResultProcessor extends ResultProcessor {
         builder.append("  \"@class\" : \"org.apereo.cas.services.RegexRegisteredService" + singleLineEnd)
         builder.append("  \"serviceId\" : \"" + cs.serviceId + singleLineEnd)
         builder.append("  \"id\" : \"" + cs.id + singleLineEnd)
-        builder.append("  \"name\" : \"" + fileName + singleLineEnd)
+        builder.append("  \"name\" : \"" + fileName.substring(0, fileName.indexOf("-")) + singleLineEnd)
 
         if (!cs?.description) {
             builder.append("  \"description\" : \"" + cs.name + singleLineEnd)
@@ -179,8 +195,10 @@ class CASJSONResultProcessor extends ResultProcessor {
                 builder.append("    \"authorizedToReleaseCredentialPassword\" : \"" + cs.authorizedToReleaseCredentialPassword + blockEnd)
             } else if (cs?.authorizedToReleaseProxyGrantingTicket) {
                 builder.append(", " + System.lineSeparator() + "    \"authorizedToReleaseProxyGrantingTicket\" : \"" + cs.authorizedToReleaseProxyGrantingTicket + blockEnd)
-            } else {
+            } else if (cs?.authorizedToReleaseCredentialPassword) {
                 builder.append(", " + System.lineSeparator() + "    \"authorizedToReleaseCredentialPassword\" : \"" + cs.authorizedToReleaseCredentialPassword + blockEnd)
+            } else {
+                builder.append(System.lineSeparator() + "  }, " + System.lineSeparator())
             }
         }
 
