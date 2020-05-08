@@ -19,5 +19,5 @@ dependencies {
 }
 
 application {
-    mainClassName = 'net.unicon.iam.shibboleth.idp.service.converter.MainClass'
+    mainClassName = 'net.unicon.iam.saml2.service.converter.MainClass'
 }

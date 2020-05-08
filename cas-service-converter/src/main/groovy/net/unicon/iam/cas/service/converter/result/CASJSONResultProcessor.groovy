@@ -97,7 +97,7 @@ class CASJSONResultProcessor extends ResultProcessor {
         if (!cs?.description) {
             builder.append("  \"description\" : \"" + cs.name + singleLineEnd)
         } else {
-            builder.append("  \"description\" : \"" + cs.description + singleLineEnd)
+            builder.append("  \"description\" : \"" + formatDescription(cs.description) + singleLineEnd)
         }
 
         builder.append("  \"evaluationOrder\" : \"" + cs.evaluationOrder + singleLineEnd)
@@ -110,7 +110,7 @@ class CASJSONResultProcessor extends ResultProcessor {
             builder.append("  \"logoutType\" : \"" + cs.logoutType + singleLineEnd)  //TODO need any validation correct logout type here?
         }
 
-        if (cs?.usernameAttribute || cs?.anonymousAccess.equalsIgnoreCase("true")) {
+        if (cs?.usernameAttribute || cs?.anonymousAccess?.equalsIgnoreCase("true")) {
             builder.append("  \"usernameAttributeProvider\" : { " + System.lineSeparator())
 
             if (cs?.anonymousAccess) {
@@ -135,7 +135,7 @@ class CASJSONResultProcessor extends ResultProcessor {
             }
         }
 
-        if (cs?.allowedToProxy && cs?.allowedToProxy.equalsIgnoreCase("true")) {
+        if (cs?.allowedToProxy && cs?.allowedToProxy?.equalsIgnoreCase("true")) {
             builder.append("  \"proxyPolicy\" : { " + System.lineSeparator())
             builder.append("    \"@class\" : \"org.apereo.cas.services.RegexMatchingRegisteredServiceProxyPolicy" + singleLineEnd)
             builder.append("    \"pattern\" : \"^https?://.*" + blockEnd)
@@ -163,16 +163,27 @@ class CASJSONResultProcessor extends ResultProcessor {
             }
         }
 
-        if (cs?.releaseAttributes && !cs?.releaseAttributes.equalsIgnoreCase("default")) {
-            if (cs?.staticAttributes) {
-                cs.staticAttributes.each { k, v ->
-                    builder.append("//\"" + k + "\" : \"" + v + singleLineEnd)  //add as comment for now
+        if (cs?.staticAttributes) {
+            builder.append("  \"properties\" : { " + System.lineSeparator())
+            builder.append("    \"@class\" : \"java.util.HashMap\"," + System.lineSeparator())
+            cs.staticAttributes.eachWithIndex { kv, idx ->
+                //builder.append("//\"" + k + "\" : \"" + v + System.lineSeparator())  //add as comment
+                if (idx == 0) {
+                    builder.append("    \"" + kv.getKey() + "\" : { " + System.lineSeparator())
+                } else {
+                    builder.append("," + System.lineSeparator() + "    \"" + kv.getKey() + "\" : { " + System.lineSeparator())
                 }
+                builder.append("        \"@class\" : \"org.apereo.cas.services.DefaultRegisteredServiceProperty" + singleLineEnd)
+                builder.append("        \"values\" : [ \"java.util.HashSet\", [ \"" + kv.getValue() + "\" ] ]" + System.lineSeparator())
+                builder.append("    }")
             }
+            builder.append(System.lineSeparator() + "  }, " + System.lineSeparator())
+        }
 
+        if (cs?.releaseAttributes && !cs?.releaseAttributes?.equalsIgnoreCase("default")) {
             builder.append("  \"attributeReleasePolicy\" : { " + System.lineSeparator())
 
-            if (cs?.releaseAttributes.equalsIgnoreCase("all")) {
+            if (cs?.releaseAttributes?.equalsIgnoreCase("all")) {
                 builder.append("    \"@class\" : \"org.apereo.cas.services.ReturnAllAttributeReleasePolicy")
 
             } else {
@@ -216,5 +227,14 @@ class CASJSONResultProcessor extends ResultProcessor {
         } else {
             return toReturn + endFile
         }
+    }
+
+    def formatDescription (final String description) {
+        return description
+                .replaceAll("\b", "\\\\b")
+                .replaceAll("\f", "\\\\f")
+                .replaceAll("\n", "\\\\n")
+                .replaceAll("\r", "\\\\r")
+                .replaceAll("\t", "\\\\t")
     }
 }

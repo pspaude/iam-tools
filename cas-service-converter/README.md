@@ -1,6 +1,6 @@
 # CAS and Shibboleth Service Conversion
 
-Tool for converting between CAS JSON formats and also between Shibboleth IdP CAS bean definitions.
+Tool for converting CAS Service Definitions and Entries between various Apereo CAS Server and Shibboleth IdP Formats.
 
 Set options in the `src/main/resources/converter.properties` file.
 - currentdirorfile =   Current service location (can be file or directory path)

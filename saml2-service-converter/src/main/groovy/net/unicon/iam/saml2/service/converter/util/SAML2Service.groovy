@@ -1,0 +1,57 @@
+package net.unicon.iam.saml2.service.converter.util
+
+
+class SAML2Service {
+    String serviceId
+    String name
+    String id
+    String description
+    String evaluationOrder
+    String metadataLocation
+    String metadataSignatureLocation
+    String requireSignedRoot
+    String signAssertions
+    String signResponses
+    String encryptionOptional
+    String encryptAssertions
+    String encryptAttributes
+    List<String> encryptableAttributes
+    String requiredAuthenticationContextClass
+    String requiredNameIdFormat
+    String skewAllowance
+    String metadataCriteriaPattern
+    String metadataCriteriaDirection
+    String metadataCriteriaRoles
+    String metadataCriteriaRemoveEmptyEntitiesDescriptors
+    String metadataCriteriaRemoveRolelessEntityDescriptors
+    String attributeNameFormats
+    String attributeValueTypes
+    String nameIdQualifier
+    String issuerEntityId
+    String assertionAudiences
+    String serviceProviderNameIdQualifier
+    String skipGeneratingAssertionNameId
+    String skipGeneratingTransientNameId
+    String skipGeneratingSubjectConfirmationInResponseTo
+    String skipGeneratingSubjectConfirmationNotOnOrAfter
+    String skipGeneratingSubjectConfirmationRecipient
+    String skipGeneratingSubjectConfirmationNotBefore
+    String skipGeneratingSubjectConfirmationNameId
+    String signingCredentialFingerprint
+    String signingCredentialType
+    String signingSignatureReferenceDigestMethods
+    String signingSignatureAlgorithms
+    String signingSignatureBlackListedAlgorithms
+    String signingSignatureCanonicalizationAlgorithm
+    String encryptionDataAlgorithms
+    String encryptionKeyAlgorithms
+    String encryptionBlackListedAlgorithms
+    String encryptionWhiteListedAlgorithms
+    String whiteListBlackListPrecedence
+    String usernameAttribute
+    String logoutType
+    String releaseAttributes
+    String ssoEnabled
+    String enabled
+    String theme
+}
