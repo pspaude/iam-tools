@@ -29,7 +29,7 @@ class CAS3JSONConverter {
                             id: service?.id,
                             description: service?.description,
                             evaluationOrder: service?.evaluationOrder,
-                            usernameAttribute: service?.usernameAttributeProvider?.usernameAttribute,
+                            usernameAttribute: handleUsernameAttribute(service),
                             logoutType: service?.logoutType,
                             releaseAttributes: service?.allowedAttributes?.join(","),
                             authorizedToReleaseCredentialPassword: service?.attributeReleasePolicy?.authorizedToReleaseCredentialPassword,
@@ -88,6 +88,17 @@ class CAS3JSONConverter {
             }
 
             return toReturn
+        }
+        return null
+    }
+
+    private static String handleUsernameAttribute(def service) {
+        if (service) {
+            if (service.usernameAttributeProvider) {
+                return service.usernameAttributeProvider.usernameAttribute
+            } else if (service.usernameAttribute) {
+                return service.usernameAttribute
+            }
         }
         return null
     }

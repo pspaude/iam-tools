@@ -185,7 +185,7 @@ class CASJSONResultProcessor extends ResultProcessor {
             builder.append("  \"logoutType\" : \"" + cs.logoutType + singleLineEnd)  //TODO need any validation correct logout type here?
         }
 
-        if (false && cs?.usernameAttribute) {
+        if (false && cs?.usernameAttribute) { //TODO FIX THIS!
             builder.append("  \"usernameAttributeProvider\" : { " + System.lineSeparator())
             builder.append("    \"@class\" : \"org.apereo.cas.services.PrincipalAttributeRegisteredServiceUsernameProvider" + singleLineEnd)
             builder.append("    \"usernameAttribute\" : \"" + cs.usernameAttribute + blockEnd)

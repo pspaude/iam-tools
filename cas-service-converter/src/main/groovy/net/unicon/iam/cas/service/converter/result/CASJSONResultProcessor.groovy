@@ -113,7 +113,7 @@ class CASJSONResultProcessor extends ResultProcessor {
         if (cs?.usernameAttribute || cs?.anonymousAccess?.equalsIgnoreCase("true")) {
             builder.append("  \"usernameAttributeProvider\" : { " + System.lineSeparator())
 
-            if (cs?.anonymousAccess) {
+            if (cs?.anonymousAccess.equalsIgnoreCase("true")) {
                 builder.append("    \"@class\" : \"org.apereo.cas.services.AnonymousRegisteredServiceUsernameAttributeProvider" + blockEnd)
             } else {
                 builder.append("    \"@class\" : \"org.apereo.cas.services.PrincipalAttributeRegisteredServiceUsernameProvider" + singleLineEnd)

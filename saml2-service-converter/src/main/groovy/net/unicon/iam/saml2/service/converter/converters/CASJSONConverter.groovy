@@ -113,7 +113,7 @@ class CASJSONConverter {
                     skipGeneratingSubjectConfirmationRecipient: json?.skipGeneratingSubjectConfirmationRecipient?.asString(),
                     skipGeneratingSubjectConfirmationNotBefore: json?.skipGeneratingSubjectConfirmationNotBefore?.asString(),
                     skipGeneratingSubjectConfirmationNameId: json?.skipGeneratingSubjectConfirmationNameId?.asString(),
-                    usernameAttribute: json?.usernameAttributeProvider?.usernameAttribute?.asString(),
+                    usernameAttribute: handleUsernameAttribute(json),
                     logoutType: json?.logoutType?.asString(),
                     releaseAttributes: releaseAttributes,
             )
@@ -123,5 +123,16 @@ class CASJSONConverter {
             skipCount++
             return null
         }
+    }
+
+    private static String handleUsernameAttribute(def service) {
+        if (service) {
+            if (service.usernameAttributeProvider) {
+                return service.usernameAttributeProvider.usernameAttribute
+            } else if (service.usernameAttribute) {
+                return service.usernameAttribute
+            }
+        }
+        return null
     }
 }

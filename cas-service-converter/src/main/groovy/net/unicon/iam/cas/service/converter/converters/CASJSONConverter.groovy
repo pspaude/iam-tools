@@ -71,7 +71,7 @@ class CASJSONConverter {
                     id: json?.id?.asInt(),
                     description: json?.description?.asString(),
                     evaluationOrder: json?.evaluationOrder?.asInt(),
-                    usernameAttribute: json?.usernameAttributeProvider?.usernameAttribute?.asString(),
+                    usernameAttribute: handleUsernameAttribute(json),
                     logoutType: json?.logoutType?.asString(),
                     mfaProviders: json?.multifactorPolicy?.multifactorAuthenticationProviders?.get(1)?.values()?.join(",")?.replaceAll("\"", ""), //TODO likely need to fix
                     mfaFailureMode: json?.multifactorPolicy?.failureMode?.asString(),  //TODO likely need to fix
@@ -87,5 +87,16 @@ class CASJSONConverter {
             skipCount++
             return null
         }
+    }
+
+    private static String handleUsernameAttribute(def service) {
+        if (service) {
+            if (service.usernameAttributeProvider) {
+                return service.usernameAttributeProvider.usernameAttribute
+            } else if (service.usernameAttribute) {
+                return service.usernameAttribute
+            }
+        }
+        return null
     }
 }
