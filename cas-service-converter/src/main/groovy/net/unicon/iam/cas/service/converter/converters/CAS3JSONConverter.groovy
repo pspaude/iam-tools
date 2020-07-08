@@ -58,7 +58,7 @@ class CAS3JSONConverter {
      */
     private static String convertAntToJavaRegex(final String serviceId) {
         if (serviceId && !serviceId.isEmpty()) {
-            def toReturn = serviceId?.trim()?.replace("http*", "https?").replaceAll("(\\*\\*|\\*)", ".*")
+            def toReturn = serviceId?.trim()?.replace("http*", "https?").replaceAll("\\.", "\\\\\\\\.").replaceAll("(\\*\\*|\\*)", ".*")
 
             if (serviceId.endsWith("(http|https)")) {
                 toReturn = "https?://" + (toReturn.substring(0, toReturn.indexOf("(http|https)")))
