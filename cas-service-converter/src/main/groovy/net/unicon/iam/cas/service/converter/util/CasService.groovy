@@ -11,6 +11,7 @@ class CasService {
     String logoutType
     String mfaProviders
     String mfaFailureMode
+    Map<String, String> mfaPrincipalAttributeTriggers
     String releaseAttributes
     String authorizedToReleaseCredentialPassword
     String authorizedToReleaseProxyGrantingTicket

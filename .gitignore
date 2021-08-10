@@ -13,3 +13,4 @@ bin/
 *.iml
 *.log
 out/
+WORK-DIRECTORY/

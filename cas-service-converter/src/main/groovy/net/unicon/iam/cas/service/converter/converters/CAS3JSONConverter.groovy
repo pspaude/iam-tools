@@ -22,6 +22,8 @@ class CAS3JSONConverter {
                         println "\nWarning: JSON for service [${service.toString()}] is not complete/valid. Missing or empty serviceId, name or id!"
                     }
 
+                    def parsedExtraAttributes = convertExtraAttributes(service?.extraAttributes)
+
                     //TODO any other properties to capture?
                     resultProcessor.storeResult(new CasService(
                             serviceId: convertAntToJavaRegex(service?.serviceId),
@@ -41,7 +43,9 @@ class CAS3JSONConverter {
                             allowedToProxy: service?.allowedToProxy,
                             anonymousAccess: service?.anonymousAccess,
                             theme: service?.theme,
-                            staticAttributes: convertExtraAttributes(service?.extraAttributes)
+                            mfaProviders: parsedExtraAttributes?.get("mfaProviders")?.keySet()?.join(","),
+                            mfaPrincipalAttributeTriggers: parsedExtraAttributes?.get("mfaPrincipalAttributeTriggers"),
+                            staticAttributes: parsedExtraAttributes?.get("staticAttributes")
                     ))
                 } catch (Exception e) {
                     println "Error processing single JSON 3x Service with id ${service?.id} with exception " + e
@@ -58,7 +62,7 @@ class CAS3JSONConverter {
      */
     private static String convertAntToJavaRegex(final String serviceId) {
         if (serviceId && !serviceId.isEmpty()) {
-            def toReturn = serviceId?.trim()?.replace("http*", "https?").replaceAll("\\.", "\\\\\\\\.").replaceAll("(\\*\\*|\\*)", ".*")
+            def toReturn = serviceId?.trim()?.replace("http*", "https?")?.replaceAll("\\.", "\\\\\\\\.")?.replaceAll("(\\*\\*|\\*)", ".*")
 
             if (serviceId.endsWith("(http|https)")) {
                 toReturn = "https?://" + (toReturn.substring(0, toReturn.indexOf("(http|https)")))
@@ -69,7 +73,6 @@ class CAS3JSONConverter {
             }
 
             //TODO any other conditions in ant to capture?
-
             return toReturn
         }
 
@@ -80,15 +83,53 @@ class CAS3JSONConverter {
      * Converts as best possible the custom extra attributes notation
      * @param extraAttrs
      */
-    private static Map<String,String> convertExtraAttributes(def extraAttrs) {
+    private static Map<String, Map<String, String>> convertExtraAttributes(def extraAttrs) {
         if (extraAttrs) {
-            def toReturn = [:]
+            Map<String, Map<String, String>> toReturn = [:]
+            def mfaProviders = [:]
+            def mfaPrincipalAttributes = [:]
+            def staticAttributes = [:]
+
             extraAttrs.each {k,v ->
-                toReturn.put(k.trim(),v.trim())
+                if ("authn_method".equalsIgnoreCase(k.toString())) {
+                    def provider
+                    if ("duo-two-factor".equalsIgnoreCase(v.toString())) {
+                        provider = "mfa-duo"
+                    } else {
+                        provider = v.toString().trim()
+                    }
+                    mfaProviders.put(provider, v)
+
+                } else if ("mfa_role".equalsIgnoreCase(k.toString())) {
+                    def attrName = ""
+                    def attrPattern = ""
+
+                    v.each {key,value ->
+                        if ("mfa_attribute_name".equalsIgnoreCase(key.toString())) {
+                            attrName = value.toString().trim()
+                        }
+                        if ("mfa_attribute_pattern".equalsIgnoreCase(key.toString())) {
+                            attrPattern = value.toString().trim()
+                        }
+                        if (!attrName.isBlank() && !attrPattern.isBlank()) {
+                            mfaPrincipalAttributes.put(attrName, attrPattern)
+                            attrName = ""
+                            attrPattern = ""
+                        }
+                    }
+
+                } else {
+                    staticAttributes.put(k.toString().trim(), v.toString().trim())
+                }
             }
+
+            toReturn.put("mfaProviders", mfaProviders)
+            toReturn.put("mfaPrincipalAttributeTriggers", mfaPrincipalAttributes)
+            toReturn.put("staticAttributes", staticAttributes)
 
             return toReturn
         }
+
         return null
     }
 

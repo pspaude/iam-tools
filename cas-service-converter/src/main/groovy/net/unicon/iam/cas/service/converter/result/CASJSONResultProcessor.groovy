@@ -158,6 +158,16 @@ class CASJSONResultProcessor extends ResultProcessor {
 
             if (cs?.mfaFailureMode) {
                 builder.append(", " + System.lineSeparator() + "    \"failureMode\" : \"" + cs.mfaFailureMode + blockEnd)
+            }
+
+            if (cs?.mfaPrincipalAttributeTriggers) {
+
+                cs.mfaPrincipalAttributeTriggers.each{k,v ->
+                    builder.append(", " + System.lineSeparator() + "    \"principalAttributeNameTrigger\" : \"" + k + singleLineEnd)
+                    builder.append("    \"principalAttributeValueToMatch\" : \"" + v + "\"")
+                }
+                builder.append(System.lineSeparator() + "  }, " + System.lineSeparator())
+
             } else {
                 builder.append(System.lineSeparator() + "  }, " + System.lineSeparator())
             }
