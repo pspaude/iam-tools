@@ -15,4 +15,8 @@ class ShibbolethIdpResultProcessor extends ResultProcessor {
         //TODO
     }
 
+    @Override
+    void outputNotes() {
+        //TODO
+    }
 }

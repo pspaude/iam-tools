@@ -1,6 +1,6 @@
 # SAML2 Service Provider Configuration Conversion
 
-Tool for converting SAML2 Service Provider definitions between Shibboleth IdP and Apereo CAS Server definitions.
+Tool for converting SAML2 protocol Service Provider definitions between Shibboleth IdP and Apereo CAS Server formats.
 
 Set options in the `src/main/resources/converter.properties` file.
 - currentdirorfile =   Current SAML2 location (should point to CAS JSON Services location or Shibboleth IdP idp_home/conf directories)
@@ -11,8 +11,9 @@ Set options in the `src/main/resources/converter.properties` file.
 - metadatalocation = The location of file based metadata (in the case of outputting to CAS 5x JSON and you want entityId to be populated automatically)
 
 Current formats accepted: 
--    casjson (not available yet)
--    shib3x
+- casjson (not available yet)
+- shib2x
+- shib3x
     
 Result formats accepted:
 -    cas5json

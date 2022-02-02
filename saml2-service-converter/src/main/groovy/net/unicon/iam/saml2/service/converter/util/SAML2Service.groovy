@@ -50,7 +50,7 @@ class SAML2Service {
     String whiteListBlackListPrecedence
     String usernameAttribute
     String logoutType
-    String releaseAttributes
+    List<AttributeDefinition> releaseAttributes
     String ssoEnabled
     String enabled
     String theme

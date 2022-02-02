@@ -6,4 +6,10 @@ class AttributeDefinition {
     String friendlyName
     String saml2String
     String type
+    String scope
+    Tuple2<String,String> map //sourceValue, returnValue
+
+    AttributeDefinition(final String id) {
+        this.id = id
+    }
 }

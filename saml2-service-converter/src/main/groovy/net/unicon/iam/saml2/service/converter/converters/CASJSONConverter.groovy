@@ -1,6 +1,7 @@
 package net.unicon.iam.saml2.service.converter.converters
 
 import groovy.io.FileType
+import net.unicon.iam.saml2.service.converter.util.AttributeDefinition
 import org.hjson.JsonValue;
 import net.unicon.iam.saml2.service.converter.result.ResultProcessor
 import net.unicon.iam.saml2.service.converter.util.SAML2Service
@@ -52,17 +53,23 @@ class CASJSONConverter {
         def json = JsonValue.readHjson(file.text) //throws parse exception if invalid hjson
 
         if (json?.isObject() && json?.getAt("@class")?.toString()?.contains("SamlRegisteredService")) {
-            def releaseAttributes = "default"
+            final List<AttributeDefinition> releaseAttributes = []
             if (json?.attributeReleasePolicy?.get("@class")?.toString()?.contains("ReturnAllAttributeReleasePolicy")) {
-                releaseAttributes = "all"
+                releaseAttributes.add(new AttributeDefinition("all"))
             } else if (json?.attributeReleasePolicy?.get("@class")?.toString()?.contains("ReturnAllowedAttributeReleasePolicy")) {
                 if (json?.attributeReleasePolicy?.allowedAttributes?.size() > 0) {
-                    releaseAttributes = json?.attributeReleasePolicy?.allowedAttributes?.get(1)?.values()?.join(",")?.replaceAll("\"", "")
+                    json?.attributeReleasePolicy?.allowedAttributes?.get(1)?.values()?.each { it ->
+                        releaseAttributes.add(new AttributeDefinition(it.trim().replaceAll("\"", "")))
+                    }
                 } else {
-                    releaseAttributes = "default"
+                    releaseAttributes.add(new AttributeDefinition("default"))
                 }
             } else {
                 //TODO DenyAllAttributeReleasePolicy,ReturnMappedAttributeReleasePolicy and warn user to manually convert groovy,python, rest, regex etc.
+            }
+
+            if (releaseAttributes.isEmpty()) {
+                releaseAttributes.add(new AttributeDefinition("default"))
             }
             //TODO Username=persistentIdGenerator, Encryption Algorithms?!?
             /*List<String> encryptableAttributes

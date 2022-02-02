@@ -8,6 +8,9 @@ import java.nio.charset.StandardCharsets
 
 class CASJSONResultProcessor extends ResultProcessor {
 
+    private static final Set<AttributeDefinition> globalFriendlyNames = []
+
+
     CASJSONResultProcessor(resultLocation, resultFormat) {
         super(resultLocation, resultFormat)
     }
@@ -50,50 +53,42 @@ class CASJSONResultProcessor extends ResultProcessor {
                 }
             }
             println "Created ${fileCount} CAS 5.x+ SAML2 JSON Service Files"
-            final Set<String> attributesToRelease = []
-            attributeStorage.keySet().each { attrList ->
-                attrList.each {
-                    attributesToRelease.add(it)
-                }
-            }
-
-            //Output notes and messages for manual review
-            new File(resultLocation.getAbsolutePath() + File.separator + "NOTES.txt")
-                    .withWriterAppend(StandardCharsets.UTF_8.name()) { out ->
-                        out.println "List of Attributes to be Released: [" + attributesToRelease.toString() + "]."
-
-                        out.println "\n***BEGIN NOTES***"
-                        messageList.each { i ->
-                            out.println i
-                        }
-                        out.println "\n***END NOTES****"
-                    }
-
-//            def fileNamesStripped = [:]
-//            fileNamesUsed.each { it ->
-//                fileNamesStripped.put(it.substring(0,it.indexOf("-")), it)
-//            }
-//            def old = new File("/home/paul/Desktop/saml2")
-//            if (old) {
-//                old.eachFileRecurse { file ->
-//                    try {
-//                        def fileName = file.name
-//                        if (fileName.contains("-")) {
-//                            def strp = fileName.substring(0, fileName.indexOf("-"))
-//                            if (fileNamesStripped.containsKey(strp)) {
-//                                def filePath = file.getParent() + File.separator + fileNamesStripped.get(strp)
-//                                file.renameTo(filePath)
-//                            }
-//                        }
-//                    }catch (Exception e) {
-//                        println "BLAH"
-//                    }
-//                }
-//            }
+            outputNotes()
 
         } else {
             //Do nothing not the right format
         }
+    }
+
+    @Override
+    void outputNotes() {
+        final Set<String> attributesToRelease = []
+        attributeStorage.keySet().each { attrList ->
+            attrList.each {
+                attributesToRelease.add(it)
+            }
+        }
+
+        //Output notes and messages for manual review
+        messageList.add("\n\nBEGIN List of possible encodings: ")
+
+        globalFriendlyNames.eachWithIndex{ it, int i ->
+            if (it.saml2String != null && it.friendlyName != null && it.saml2String != it.friendlyName) {
+                messageList.add("cas.authn.samlIdp.attributeFriendlyNames[" + i + "]=" + it.saml2String + "->" + it.friendlyName + "\n")
+            }
+        }
+        messageList.add("END Attribute Encodings\n\n")
+
+        new File(resultLocation.getAbsolutePath() + File.separator + "NOTES.txt")
+                .withWriterAppend(StandardCharsets.UTF_8.name()) { out ->
+                    out.println "List of Attributes to be Released: [" + attributesToRelease.toString() + "]."
+
+                    out.println "\n***BEGIN NOTES***"
+                    messageList.each { i ->
+                        out.println i
+                    }
+                    out.println "\n***END NOTES****"
+                }
     }
 
     def createCASServiceFileName(final String serviceName, int fileCount, final String id) {
@@ -185,7 +180,7 @@ class CASJSONResultProcessor extends ResultProcessor {
             builder.append("  \"logoutType\" : \"" + cs.logoutType + singleLineEnd)  //TODO need any validation correct logout type here?
         }
 
-        if (false && cs?.usernameAttribute) { //TODO FIX THIS!
+        if (cs?.usernameAttribute) { //TODO FIX THIS!
             builder.append("  \"usernameAttributeProvider\" : { " + System.lineSeparator())
             builder.append("    \"@class\" : \"org.apereo.cas.services.PrincipalAttributeRegisteredServiceUsernameProvider" + singleLineEnd)
             builder.append("    \"usernameAttribute\" : \"" + cs.usernameAttribute + blockEnd)
@@ -233,25 +228,59 @@ class CASJSONResultProcessor extends ResultProcessor {
 //            }
 //        }
 
-        if (false && cs?.releaseAttributes && !cs?.releaseAttributes?.equalsIgnoreCase("default")) {
+        if (cs?.releaseAttributes && !cs?.releaseAttributes?.contains("default")) {
             builder.append("  \"attributeReleasePolicy\" : { " + System.lineSeparator())
 
-            if (cs?.releaseAttributes?.equalsIgnoreCase("all")) {
+            if (cs?.releaseAttributes?.contains("all")) {
                 builder.append("    \"@class\" : \"org.apereo.cas.services.ReturnAllAttributeReleasePolicy")
 
             } else {
-                builder.append("    \"@class\" : \"org.apereo.cas.services.ReturnAllowedAttributeReleasePolicy" + singleLineEnd)
-                builder.append("    \"allowedAttributes\" : [ \"java.util.ArrayList\", [ ")
+                def isSaml2StringDiffFriendlyName = cs.releaseAttributes.stream()
+                        .filter({ it ->
+                            (it != null && it?.saml2String?.trim() && it.sourceId != it.saml2String)
+                        })
+                        .findAny()
 
-                def allowedList = cs.releaseAttributes.split(",")
-                allowedList.each { val ->
-                    if (val == allowedList.last()) {
-                        builder.append("\"" + val + "\"")
-                    } else {
-                        builder.append("\"" + val + "\", ")
+                //TODO Refactor the below to handle all various scenarios (probably chaining)
+                if (isSaml2StringDiffFriendlyName.isPresent()) {
+                    builder.append("      \"@class\" : \"org.apereo.cas.services.ReturnMappedAttributeReleasePolicy" + singleLineEnd)
+                    builder.append("      \"allowedAttributes\" : { " + System.lineSeparator())
+                    builder.append("          \"@class\" : \"java.util.TreeMap\"")
+
+                    cs.releaseAttributes.each{ it ->
+                        if (it && it.sourceId && it.saml2String) {
+                            if (it?.scope?.trim()) {
+                                builder.append(", " + System.lineSeparator() + "          \"" + it.saml2String + "\" : \"groovy { return attributes['" + it.sourceId + "'].get(0) + '" + it.scope + "'}\"")
+
+                            } else if (it.map != null) {
+                                builder.append(", " + System.lineSeparator() + "          \"" + it.saml2String + "\" : \"MAPPED ATTRIBUTE HANDLE MANUALLY: SOURCE['" + it.sourceId + "'] sourceValue=['" + it.map.getFirst() + "] returnValue=[" + it.map.getSecond() + "] VALUE[\"groovy { return attributes['memberOf'].any{it =~ CN=([^,]*),.*}.toString() }]'}\"") //TODO redo this into filter
+
+                            } else {
+                                builder.append(", " + System.lineSeparator() + "          \"" + it.sourceId + "\" : \"" + it.saml2String + "\"")
+                            }
+
+                            if (it.saml2String != it.friendlyName) {
+                                globalFriendlyNames.add(it)
+                            }
+                        } else {
+                            println "Info: Didn't process attribute ${it.id} for service: ${cs.id} because attribute has no saml2 name! Most likely this is a nameId only attribute and can be ignored!"
+                        }
                     }
+
+                    builder.append(System.lineSeparator() + "    }")
+
+                } else {
+                    builder.append("    \"@class\" : \"org.apereo.cas.services.ReturnAllowedAttributeReleasePolicy" + singleLineEnd)
+                    builder.append("    \"allowedAttributes\" : [ \"java.util.ArrayList\", [ ")
+                    cs.releaseAttributes.each { attrdef ->
+                        if (attrdef == cs.releaseAttributes.last()) {
+                            builder.append("\"" + attrdef.sourceId + "\"")
+                        } else {
+                            builder.append("\"" + attrdef.sourceId + "\", ")
+                        }
+                    }
+                    builder.append("    }" + System.lineSeparator() + "")
                 }
-                builder.append(" ] ]")
             }
 
 //            if (cs?.authorizedToReleaseProxyGrantingTicket && cs?.authorizedToReleaseCredentialPassword) {
@@ -266,9 +295,9 @@ class CASJSONResultProcessor extends ResultProcessor {
 //            }
         } else if (!cs?.releaseAttributes) {
             //TODO Make this optional!!!
-            builder.append("  \"attributeReleasePolicy\" : { " + System.lineSeparator())
-            builder.append("    \"@class\" : \"org.apereo.cas.support.saml.services.GroovySamlRegisteredServiceAttributeReleasePolicy" + singleLineEnd)
-            builder.append("    \"groovyScript\" : \"file:/etc/cas/services/scripts/Saml2AttributeRelease.groovy" + blockEnd)
+//            builder.append("  \"attributeReleasePolicy\" : { " + System.lineSeparator())
+//            builder.append("    \"@class\" : \"org.apereo.cas.support.saml.services.GroovySamlRegisteredServiceAttributeReleasePolicy" + singleLineEnd)
+//            builder.append("    \"groovyScript\" : \"file:/etc/cas/services/scripts/Saml2AttributeRelease.groovy" + blockEnd)
         }
 
 //        if (cs?.publicKeyLocation && cs?.publicKeyAlgorithm) {

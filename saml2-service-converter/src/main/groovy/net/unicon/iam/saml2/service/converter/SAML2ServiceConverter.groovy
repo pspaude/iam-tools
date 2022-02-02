@@ -1,6 +1,7 @@
 package net.unicon.iam.saml2.service.converter
 
-import net.unicon.iam.saml2.service.converter.converters.ShibbolethIdPXmlConverter
+import net.unicon.iam.saml2.service.converter.converters.ShibbolethIdPv2XmlConverter
+import net.unicon.iam.saml2.service.converter.converters.ShibbolethIdPv3XmlConverter
 import net.unicon.iam.saml2.service.converter.result.CASJSONResultProcessor
 import net.unicon.iam.saml2.service.converter.result.ShibbolethIdpResultProcessor
 import net.unicon.iam.saml2.service.converter.util.ResultFormats
@@ -25,6 +26,7 @@ class SAML2ServiceConverter implements Runnable {
     def resultFormat
     def resultLocation
     def startingId
+    def startingEvalOrder
     def metadataLocation
 
 
@@ -37,11 +39,15 @@ class SAML2ServiceConverter implements Runnable {
             def origPath = config.getProperty("converter.currentdirorfile").toString().trim()
             def resultPath = config.getProperty("converter.resultlocation").toString().trim()
 
-            if (!config.getProperty("converter.startingid").isBlank()) {
+            if (config?.getProperty("converter.startingid") != null) {
                 startingId = config.getProperty("converter.startingid").trim().toBigInteger()
             }
 
-            if (!config.getProperty("converter.metadatalocation").isBlank()) {
+            if (config?.getProperty("converter.startingevalorder") != null) {
+                startingEvalOrder = config.getProperty("converter.startingevalorder").trim().toBigInteger()
+            }
+
+            if (config?.getProperty("converter.metadatalocation") != null) {
                 metadataLocation = new File(config.getProperty("converter.metadatalocation").trim())
             }
 
@@ -85,12 +91,16 @@ class SAML2ServiceConverter implements Runnable {
             def resultProcessor = ((resultFormat?.equalsIgnoreCase(ResultFormats.cas5json.toString())) ? new CASJSONResultProcessor(resultLocation, ResultFormats.cas5json) : new ShibbolethIdpResultProcessor(resultLocation, resultFormat))
 
             if (currentFormat.equalsIgnoreCase(OriginalFormats.casjson.toString())) {
-                println "\nProcessing CAS 5+ JSON file directory..."
+                println "\nProcessing CAS 5+ JSON SAML2 files directory..."
                 CASJSONConverter.convertCASJSON(currentLocation.isDirectory(), currentLocation, resultProcessor)
 
+            } else if (currentFormat.equalsIgnoreCase(OriginalFormats.shib2x.toString())) {
+                println "\nProcessing Shibboleth IdP v2x Xml definition files..."
+                new ShibbolethIdPv2XmlConverter().convertShibbolethIdPXml(currentLocation, resultProcessor, metadataLocation, startingId, startingEvalOrder)
+
             } else if (currentFormat.equalsIgnoreCase(OriginalFormats.shib3x.toString())) {
-                println "\nProcessing Shibboleth IdP CAS Xml bean definition file..."
-                ShibbolethIdPXmlConverter.convertShibbolethIdPXml(currentLocation, resultProcessor, metadataLocation, startingId)
+                println "\nProcessing Shibboleth IdP v3x+ Xml definition files..."
+                new ShibbolethIdPv3XmlConverter().convertShibbolethIdPXml(currentLocation, resultProcessor, metadataLocation, startingId, startingEvalOrder)
 
             } else {
                 println "\nYou've provided an invalid currentFormat or scenario! Make sure you've configured a file or directory as appropriate for currentdir! No conversion can be performed, exiting..."

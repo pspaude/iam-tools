@@ -1,25 +1,17 @@
 package net.unicon.iam.saml2.service.converter.converters
 
-import groovy.io.FileType
 import net.unicon.iam.saml2.service.converter.result.ResultProcessor
 import net.unicon.iam.saml2.service.converter.util.AttributeDefinition
 import net.unicon.iam.saml2.service.converter.util.SAML2Service
 import groovy.xml.Namespace
 
 
-class ShibbolethIdPXmlConverter {
+class ShibbolethIdPv3XmlConverter extends BaseShibbolethIdPXmlConverter {
 
-    private final static List<String> notes = [] //list of issues that need manual review
-    private final static Map<String, String> spByMetadataName = [:] //SPs by MetadataFile Name (if provided)
-    private final static Map<String, AttributeDefinition> attributes = [:] //Attributes by Shibboleth IdP ID (used to convert to LDAP names) key=id, value is ldap name
-    private final static Map<String, List<String>> attributesToRelease = [:] //key is relyingPartyId, value is attributes to release
-    private final static Map<String, String> nameIds = [:] //key is format and value is attributes
-    private final static Map<String, SAML2Service> spByEntityId = [:] //key is entity Id, value is SAML2Service
-    private final static Integer startEvaluationOrder = 1;
-
-
-    static void convertShibbolethIdPXml(final File confDir, final ResultProcessor resultProcessor, final File metadataDir, final BigInteger startingId) {
+    @Override
+    void convertShibbolethIdPXml(final File confDir, final ResultProcessor resultProcessor, final File metadataDir, final BigInteger startingId, final BigInteger startingEvaluationId) {
         println "\n\nProcessing Shibboleth IdP Configuration at ${confDir.path}..."
+        super.convertShibbolethIdPXml(confDir, resultProcessor, metadataDir, startingId, startingEvaluationId)
 
         try {
             loadMetadata(metadataDir)
@@ -27,8 +19,8 @@ class ShibbolethIdPXmlConverter {
             loadAttributeFilter(confDir)
             loadRelyingParty(confDir)
             loadSamlNameId(confDir)
-            consumeSPsFromMetadataProviders(confDir, resultProcessor, startingId)
-            resultProcessor.storeMessages(notes)
+            consumeSPsFromMetadataProviders(confDir, resultProcessor)
+            resultProcessor.storeConversionMessages(notes)
 
             println "Processing Shibboleth IdP Configuration Complete!"
         } catch (Exception e) {
@@ -36,61 +28,8 @@ class ShibbolethIdPXmlConverter {
         }
     }
 
-    private static void loadMetadata(final File metadataDir) {
-        if (metadataDir.exists()) {
-            println "\n\nProcessing ${metadataDir.listFiles().length} possible metadata files..."
-            def skipCount = 0
-            def metadataCount = 0
-
-            try {
-                metadataDir.eachFileRecurse(FileType.FILES) { file ->
-                    try {
-                        if (file.name.endsWith(".xml") && !file.name.contains("InCommon") && !file.name.equalsIgnoreCase("idp-metadata")) {
-                            def xml = new XmlParser().parse(file)
-                            def entityIds = []
-
-                            if (xml && xml?.attributes()?.containsKey("entityID")) {
-                                entityIds.add(new XmlParser()?.parse(file)?.attributes()?.get("entityID")?.toString())
-
-                            } else if (xml) {
-                                def nodes = xml?.'**'?.findAll { node ->
-                                    node?.attributes()?.find { it.key == "entityID"}
-                                }
-
-                                nodes.each { it ->
-                                    entityIds.add(it?.attributes()?.get("entityID")?.toString())
-                                 }
-                            }
-
-                            if (!entityIds.isEmpty()) {
-                                spByMetadataName.put(file.name, entityIds.join("|"))
-                                metadataCount++
-                            } else {
-                                notes.add("\nSkipped ${file.name} because it doesn't entityId or is an Aggregate!")
-                                skipCount++
-                            }
-
-                        } else {
-                            notes.add("\nSkipped ${file.name}'s entityId because it doesn't have XML extension or is an Aggregate!")
-                            skipCount++
-                        }
-                    } catch (Exception e) {
-                        println "Error processing metadata file with name ${file.name} with exception " + e
-                        skipCount++
-                    }
-                }
-               println "\n\nProcessed ${metadataCount - skipCount} out of ${metadataCount} Shibboleth IdP metadata Files!"
-
-            } catch (Exception e) {
-                println "Error processing Shibboleth IdP Metadata with exception " + e
-            }
-
-        } else {
-            println "Skipping metadata processing since no metadata directory provided!"
-        }
-    }
-
-    private static void loadAttributeResolver(final File confDir) {
+    @Override
+    protected void loadAttributeResolver(final File confDir) {
         def definitionCount = 0
         def resolver = new Namespace("urn:mace:shibboleth:2.0:resolver")
         def xsi = new Namespace("http://www.w3.org/2001/XMLSchema-instance")
@@ -115,6 +54,18 @@ class ShibbolethIdPXmlConverter {
                             attr.sourceId = definition[resolver.InputDataConnector]?.attributes()?.get("attributeNames")?.toString()?.trim()
                         }
 
+                        try {
+                            def nameId = definition[resolver.AttributeEncoder].find({
+                                it?.attributes()?.get(xsi.type)?.toString()?.contains("SAML2StringNameID")
+                            })?.attributes()?.get("nameFormat")?.toString()?.trim()
+
+                            if (nameId) {
+                                nameIdsByFormat.put(nameId, attr.sourceId)
+                            }
+                        } catch (Exception e) {
+                            //swallow
+                        }
+
                         attr.friendlyName = definition[resolver.AttributeEncoder].find({
                             it?.attributes()?.get(xsi.type)?.toString()?.contains("SAML2")
                         })?.attributes()?.get("friendlyName")?.toString()?.trim()
@@ -122,11 +73,37 @@ class ShibbolethIdPXmlConverter {
                             it?.attributes()?.get(xsi.type)?.toString()?.contains("SAML2")
                         })?.attributes()?.get("name")?.toString()?.trim()
 
+                        try {
+                            if (type.contains("Scoped")) {
+                                def scope = definition?.attributes()?.get("scope")?.toString()
+                                if (scope) {
+                                    attr.scope = true
+                                }
+                            }
+                        } catch (Exception e) {
+                            //swallow
+                            attr.scope = "HANDLE SCOPED ATTR MANUALLY ${attr.id}"
+                        }
+
+                        try {
+                            if (type.contains("Mapped")) {
+                                def returnValue = definition['ad:ValueMap']['ad:ReturnValue'][0].value().toString()
+                                def sourceValue = definition['ad:ValueMap']['ad:SourceValue'][0].value().toString()
+
+                                if (returnValue && sourceValue) {
+                                    attr.map = new Tuple2<>(sourceValue, returnValue)
+                                }
+                            }
+                        } catch (Exception e) {
+                            //swallow
+                            attr.map = new Tuple2<>("HANDLE MAPPED ATTR MANUALLY", attr.id)
+                        }
+
                     } else {
                         notes.add("Attribute with id " + attr.id + " needs to be handled manually! Type=" + type)
                     }
 
-                    attributes.put(attr.id, attr)
+                    attributesById.put(attr.id, attr)
                     definitionCount++
 
                 } catch (Exception e) {
@@ -135,17 +112,10 @@ class ShibbolethIdPXmlConverter {
             }
 
             attributeResolver[resolver.DataConnector].each { connector ->
-                if (!connector?.attributes()[xsi.type]?.toString().contains("LDAPDirectory")) {
+                if (!connector?.attributes()[xsi.type]?.toString()?.contains("LDAPDirectory")) {
                     notes.add("Non-LDAP connector with id " + connector?.attributes()["id"]?.toString() + " needs to be handled manually! Type=" + connector?.attributes()[xsi.type]?.toString())
                 }
             }
-
-            notes.add("\n\nBEGIN List of possible encodings: ")
-            notes.add(attributes.keySet().toString() + "\n")
-            attributes.eachWithIndex{ k,v, int i ->
-                notes.add("cas.authn.samlIdp.attributeFriendlyNames[" + i + "]=" + v.saml2String + "->" + v.friendlyName + "\n")
-            }
-            notes.add("END Attribute Encodings\n\n")
 
             println "\nProcessed ${definitionCount} Attribute Definitions in attribute-resolver.xml!"
 
@@ -154,7 +124,8 @@ class ShibbolethIdPXmlConverter {
         }
     }
 
-    private static void loadAttributeFilter(final File confDir) {
+    @Override
+    protected void loadAttributeFilter(final File confDir) {
         def xsi = new Namespace("http://www.w3.org/2001/XMLSchema-instance")
         def afp = new Namespace("urn:mace:shibboleth:2.0:afp")
         def filterCount = 0
@@ -237,7 +208,8 @@ class ShibbolethIdPXmlConverter {
         }
     }
 
-    private static void loadRelyingParty(final File confDir) {
+    @Override
+    protected void loadRelyingParty(final File confDir) {
         def relyingPartyCount = 0
         def util = new Namespace("http://www.springframework.org/schema/util")
         def c = new Namespace("http://www.springframework.org/schema/c")
@@ -245,23 +217,23 @@ class ShibbolethIdPXmlConverter {
         println "Processing relying-party.xml..."
 
         try {
-            def relyingParty = new XmlParser().parse(new File(confDir.getPath() + File.separator + "relying-party.xml"))
+            def relyingPartyFile = new XmlParser().parse(new File(confDir.getPath() + File.separator + "relying-party.xml"))
 
-            relyingParty[util.list].find {
+            relyingPartyFile[util.list].find {
                 it?.attributes()["id"] == "shibboleth.RelyingPartyOverrides"
-            }.each { rp ->
+            }.each { relyingParty ->
                 try {
-                    def id = rp?.attributes()["id"] //may not be available
-                    def parent = rp?.attributes()["parent"]
+                    def id = relyingParty?.attributes()["id"] //may not be available
+                    def parent = relyingParty?.attributes()["parent"]
 
                     if (parent == "RelyingPartyByName") {
-                        def ssoBean = rp.property.list.bean.find {
+                        def ssoBean = relyingParty.property.list.bean.find {
                             it?.attributes()["parent"] == "SAML2.SSO"
                         }
 
                         if (ssoBean && !ssoBean?.attributes()?.isEmpty()) {
                             def service = new SAML2Service()
-                            def rpIds = rp?.attributes()[c.relyingPartyIds]?.toString()?.replaceAll("'|\"|}|#|\\{", "")?.trim()
+                            def rpIds = relyingParty?.attributes()[c.relyingPartyIds]?.toString()?.replaceAll("'|\"|}|#|\\{", "")?.trim()
                             service.requiredNameIdFormat = ssoBean?.attributes()[p.nameIDFormatPrecedence]?.toString()?.trim()
                             service.encryptAssertions = convertAlwaysNever(ssoBean?.attributes()[p.encryptAssertions]?.toString()?.trim())
                             service.signAssertions = convertAlwaysNever(ssoBean?.attributes()[p.signAssertions]?.toString()?.trim())
@@ -272,11 +244,11 @@ class ShibbolethIdPXmlConverter {
                                 relyingPartyCount++
                             }
                         } else {
-                            notes.add("\nSkipped relyingParty " + id + " with parent " + parent)
+                            notes.add("\nSkipped relyingParty " + id + " because it doesn't have SAML2.SSO bean or any properties!")
                         }
 
                     } else {
-                        notes.add("\nSkipped relyingParty " + id + " because it doesn't have SAML2.SSO bean or any properties!")
+                        notes.add("\nSkipped relyingParty " + id + " with parent " + parent)
                     }
 
                 } catch (Exception e) {
@@ -291,10 +263,11 @@ class ShibbolethIdPXmlConverter {
         }
     }
 
-    private static void loadSamlNameId(final File confDir) {
+    private void loadSamlNameId(final File confDir) {
         def nameIdBeanCount = 0
         def p = new Namespace("http://www.springframework.org/schema/p")
         def util = new Namespace("http://www.springframework.org/schema/util")
+        def c = new Namespace("http://www.springframework.org/schema/c")
         println "Processing saml-nameid.xml..."
 
         try {
@@ -310,7 +283,21 @@ class ShibbolethIdPXmlConverter {
                         def format = bean?.attributes()[p.format]?.toString()
                         def attrs = bean?.attributes()[p.attributeSourceIds]?.toString()?.replaceAll("'|\"|}|#|\\{", "")?.trim()
 
-                        nameIds.put(format, attrs)
+                        if (bean?.property?.get(0)?.toString()?.contains("activationCondition")) {
+                            def propBean = bean?.property?.get(0)
+                            if (propBean?.bean?.'@parent'?.toString()?.contains("RelyingPartyId")) {
+                                if (propBean?.bean?.get(0)?.attributes()[c.candidate]) {
+                                    nameIdsByRelyingParty.put(propBean?.bean?.get(0)?.attributes()[c.candidate]?.toString(), new Tuple2(format, attrs))
+                                } else if (propBean?.bean?.get(0)?.attributes()[c.candidates]) {
+                                    propBean?.bean?.get(0)?.attributes()[c.candidates].each { it ->
+                                        nameIdsByRelyingParty.put(it.toString(), new Tuple2(format, attrs))
+                                    }
+                                }
+                            }
+                            //TODO handle other conditions/possibilities
+                        } else {
+                            nameIdsByFormat.put(format, attrs)
+                        }
                         nameIdBeanCount++
                         notes.add("NAMEID-" + format + " = [" + attrs + "]")
                     }
@@ -320,22 +307,26 @@ class ShibbolethIdPXmlConverter {
             }
             println "\nCompleted ${nameIdBeanCount} Shibboleth IdP NameId Overrides in saml-nameid.xml!"
 
+        } catch (FileNotFoundException fne) {
+            println "Warn no saml-nameid.xml found skipping nameid processing! "
         } catch (Exception e) {
             println "Error processing Shibboleth IdP saml-nameid.xml with exception " + e
         }
     }
 
-    private static void consumeSPsFromMetadataProviders(final File confDir, final ResultProcessor processor, final BigInteger startId) {
+    @Override
+    protected void consumeSPsFromMetadataProviders(final File confDir, final ResultProcessor processor) {
         def providerCount = 0
         def xsi = new Namespace("http://www.w3.org/2001/XMLSchema-instance")
         def xmlns = new Namespace("urn:mace:shibboleth:2.0:metadata")
         println "Processing metadata-providers.xml..."
 
         try {
-            def metadataProviders = new XmlParser().parse(new File(confDir.getPath() + File.separator + "metadata-providers.xml"))
+            def metadataProvidersFile = new XmlParser().parse(new File(confDir.getPath() + File.separator + "metadata-providers.xml"))
             def startingId = startId
 
-            metadataProviders["MetadataProvider"].each { provider ->
+            //TODO handle MDQ, Dynamic, Folder, LocalDynamic types besides XML
+            metadataProvidersFile["MetadataProvider"].each { provider ->
                 try {
                     def type = provider?.attributes()[xsi.type]?.toString()?.trim()
                     def id = provider?.attributes()["id"]?.toString()?.trim()
@@ -346,7 +337,7 @@ class ShibbolethIdPXmlConverter {
                         def fileLocation = provider?.attributes()["metadataFile"].toString().trim()
                         metadataFile = fileLocation.substring(fileLocation.lastIndexOf("/")+1, fileLocation.length())
 
-                        processor.storeResult(prepareSAML2Service(id, metadataFile, metadataFile,null, startingId))
+                        processor.storeResult(prepareSAML2Service(id, metadataFile, metadataFile,null))
                         providerCount++
 
                     } else if (type.contains("HTTP")) {
@@ -375,104 +366,12 @@ class ShibbolethIdPXmlConverter {
                 }
             }
 
-            outputRelyingPartyAndNameIdsToNotes()  //TODO Make Optional
             println "\nCompleted ${providerCount} Shibboleth IdP Metadata Providers found in metadata-providers.xml!"
 
         } catch (Exception e) {
             println "Error processing Shibboleth IdP metadata-providers.xml with exception " + e
         }
-    }
 
-    private static SAML2Service prepareSAML2Service(final String id, final String metadataFile, final String metadataLocation, final String certFile, final BigInteger startId) {
-        def entityId = spByMetadataName.get(metadataFile)
-        def sp = new SAML2Service()
-        def releaseAttributes = []
-
-        if (entityId && entityId?.trim()) {
-            def rp = spByEntityId.containsKey(entityId) ? spByEntityId.get(entityId) : spByEntityId.find { it.key.contains(entityId) }
-
-            if (rp) {
-                //sp = rp
-//                attributesToRelease.get(entityId).each { attrId ->
-//                    def attrDef = attributes.get(attrId)
-//                    if (attrDef) {
-//                        releaseAttributes.add(attrDef.sourceId)  //TODO handle varios scenarios
-//                        //        String attributeFormats
-//                        //        String attributueTypes
-//                        //        String nameIdQualifier
-//                    }
-//                }
-//                sp.releaseAttributes = releaseAttributes
-//
-//                if (sp.requiredNameIdFormat && !sp.requiredNameIdFormat.isEmpty()) {
-//                    sp.usernameAttribute = nameIds.get(sp.requiredNameIdFormat)
-//                }
-            }
-            sp.serviceId = entityId //VERY IMPORTANT
-        }
-
-        if (!sp.serviceId) {
-            sp.serviceId = ".+"
-        }
-
-        if (!metadataLocation.contains("http")) {
-            sp.metadataLocation = "file:/etc/cas/services/sp-metadata/" + metadataLocation
-        } else {
-            sp.metadataLocation = metadataLocation
-            if (certFile && !certFile.isEmpty()) {
-                sp.metadataSignatureLocation = "file:/etc/cas/services/sp-metadata/" + certFile
-            }
-        }
-
-        sp.id = startId.toString()
-        sp.name = id
-        sp.description = id
-        sp.evaluationOrder = startEvaluationOrder.toString()
-        startEvaluationOrder++
-
-        return sp
-    }
-
-    private static String convertAlwaysNever(final String value) {
-        if (value?.equalsIgnoreCase("Always")) {
-            return "true"
-        } else if (value?.equalsIgnoreCase("Never")) {
-            return "false"
-        } else {
-            return value
-        }
-    }
-
-    private static void outputRelyingPartyAndNameIdsToNotes() {
-        notes.add("\n\n RELYING PARTIES \n")
-        Set<String> attributesForRelease = new HashSet<>()
-
-
-        //TODO refactor this use SAML2 Services Storage!!!!!
-        spByEntityId.each { entityId,sp ->
-            sp.serviceId = entityId
-            def releaseAttributes = []
-
-            attributesToRelease.get(entityId).each { attrId ->
-                def attrDef = attributes.get(attrId)
-                if (attrDef) {
-                    releaseAttributes.add(attrDef.sourceId)
-                }
-            }
-            sp.releaseAttributes = releaseAttributes.toString()
-
-            if (sp.requiredNameIdFormat && !sp.requiredNameIdFormat.isEmpty()) {
-       //         sp.usernameAttribute = nameIds.get(sp.requiredNameIdFormat)
-            }
-            notes.add("\n SP: serviceId=[" + sp.serviceId + "] nameId=[" + sp.usernameAttribute +
-                    "] encryptAssertions=[" + sp.encryptAssertions + "] signAssertions=[" +
-                    sp.signAssertions + "] signResponses=[" + sp.signResponses + "] releaseAttributes=[" + sp.releaseAttributes+ "]")
-
-            if (releaseAttributes && releaseAttributes.size() > 0) {
-                attributesForRelease.addAll(releaseAttributes)
-            }
-        }
-        notes.add("\n Attributes for release = [" + attributesForRelease.toString() + "] \n")
-        notes.add("\nEND Relying Parties! \n")
+        //TODO process metadata files independent of metadata-providers.xml
     }
 }
