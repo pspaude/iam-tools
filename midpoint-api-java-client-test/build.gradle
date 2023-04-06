@@ -1,0 +1,28 @@
+plugins {
+    id 'groovy'
+    id 'java'
+    id 'application'
+}
+
+group 'net.unicon.iam'
+version '1.0-SNAPSHOT'
+
+sourceCompatibility = 1.11
+
+repositories {
+    mavenCentral()
+    maven {
+        url "https://nexus.evolveum.com/nexus/content/repositories/releases/"
+    }
+
+}
+
+dependencies {
+    implementation "org.codehaus.groovy:groovy-all:${project.'groovy.version'}"
+    implementation 'org.apache.cxf:cxf-rt-transports-local:3.5.0'
+    implementation 'com.evolveum.midpoint.client:midpoint-client-impl-rest-jaxb:4.4.4'
+}
+
+application {
+    mainClassName = 'net.unicon.iam.test.MainClass'
+}
